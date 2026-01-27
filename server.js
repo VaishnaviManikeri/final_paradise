@@ -9,24 +9,20 @@ const app = express();
 
 /* ===================== MIDDLEWARE ===================== */
 
-// ✅ FIXED CORS (THIS IS THE IMPORTANT PART)
+// ✅ CORRECT CORS (NO CRASH)
 app.use(cors({
   origin: [
-    'http://localhost:5173',                 // frontend on localhost
-    'https://sanskrutitechnoschool.com',     // deployed frontend domain
+    'http://localhost:5173',              // local frontend
+    'https://sanskrutitechnoschool.com',  // production frontend
   ],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
 }));
 
-// Handle preflight requests explicitly (IMPORTANT for browsers)
-app.options('*', cors());
-
 app.use(express.json());
 
 /* ===================== HEALTH CHECK ===================== */
-// Must be BEFORE routes
 app.get('/', (req, res) => {
   res.status(200).json({
     status: 'OK',
