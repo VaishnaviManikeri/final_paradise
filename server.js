@@ -13,7 +13,7 @@ const app = express();
 app.use(cors({
   origin: [
     'http://localhost:5173',        // local frontend
-    'https://your-frontend.vercel.app' // add frontend URL after deploy
+    'https://sanskrutitechnoschool.com' // add frontend URL after deploy
   ],
   credentials: true
 }));
