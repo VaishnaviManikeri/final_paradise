@@ -7,15 +7,13 @@ dotenv.config();
 
 const app = express();
 
-/* ===================== MIDDLEWARE ===================== */
-
-// ✅ CORRECT CORS (NO CRASH)
+/* ===================== CORS ===================== */
 app.use(cors({
   origin: [
     'http://localhost:5173',              // local frontend
     'https://sanskrutitechnoschool.com',  // production frontend
   ],
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
 }));
@@ -27,16 +25,15 @@ app.get('/', (req, res) => {
   res.status(200).json({
     status: 'OK',
     message: 'Backend is running 🚀',
-    time: new Date().toISOString(),
   });
 });
 
 /* ===================== DATABASE ===================== */
 mongoose
   .connect(process.env.MONGO_URI)
-  .then(() => console.log('✅ Connected to MongoDB'))
+  .then(() => console.log('✅ MongoDB connected'))
   .catch((err) => {
-    console.error('❌ MongoDB connection error:', err);
+    console.error('❌ MongoDB error:', err);
     process.exit(1);
   });
 
