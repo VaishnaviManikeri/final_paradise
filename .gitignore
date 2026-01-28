@@ -1,5 +1,3 @@
+uploads/
 node_modules/
 .env
-# Ignore uploaded images
-uploads/*
-!uploads/.gitkeep
