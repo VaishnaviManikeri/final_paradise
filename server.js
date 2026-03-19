@@ -36,6 +36,11 @@ app.get("/", (req, res) => {
   });
 });
 
+/* ===================== ✅ PING ROUTE (ADDED) ===================== */
+app.get("/ping", (req, res) => {
+  res.status(200).send("✅ Server is alive");
+});
+
 /* ===================== DATABASE ===================== */
 mongoose
   .connect(process.env.MONGO_URI) // ✅ NO OPTIONS
