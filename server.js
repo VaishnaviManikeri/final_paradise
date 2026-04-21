@@ -14,6 +14,7 @@ app.use(
     origin: [
       "http://localhost:5173",
       "https://www.paradiseems.co.in",
+      "https://paradiseems.co.in",
     ],
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
@@ -28,11 +29,26 @@ app.use(express.urlencoded({ extended: true }));
 /* ===================== STATIC FILES ===================== */
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-/* ===================== HEALTH CHECK ===================== */
+/* ===================== ROOT HEALTH CHECK ===================== */
 app.get("/", (req, res) => {
   res.status(200).json({
+    success: true,
     status: "OK",
     message: "Backend is running 🚀",
+    port: process.env.PORT || 5014,
+    time: new Date(),
+  });
+});
+
+/* ===================== MAIN API HEALTH CHECK ===================== */
+/* THIS FIXES curl /api => Route not found */
+app.get("/api", (req, res) => {
+  res.status(200).json({
+    success: true,
+    status: "OK",
+    message: "API is running successfully 🚀",
+    port: process.env.PORT || 5014,
+    time: new Date(),
   });
 });
 
@@ -41,7 +57,7 @@ app.get("/ping", (req, res) => {
   res.status(200).send("✅ Server is alive");
 });
 
-/* ===================== ✅ HOSTINGER TEST API ===================== */
+/* ===================== HOSTINGER TEST API ===================== */
 app.get("/api/status", (req, res) => {
   res.status(200).json({
     success: true,
@@ -69,7 +85,10 @@ app.use("/api/blogs", require("./routes/blogs"));
 
 /* ===================== 404 HANDLER ===================== */
 app.use((req, res) => {
-  res.status(404).json({ message: "Route not found" });
+  res.status(404).json({
+    success: false,
+    message: "Route not found",
+  });
 });
 
 /* ===================== SERVER ===================== */
