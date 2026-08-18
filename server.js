@@ -11,11 +11,24 @@ const app = express();
 /* ===================== CORS ===================== */
 app.use(
   cors({
-    origin: [
-      "http://localhost:5173",
-      "https://www.paradiseems.co.in",
-      "https://paradiseems.co.in",
-    ],
+    origin: (origin, callback) => {
+      const allowedOrigins = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
+        "https://www.paradiseems.co.in",
+        "https://paradiseems.co.in",
+      ];
+
+      const isLocalhostOrigin = /^http:\/\/(localhost|127\.0\.0\.1):\d+$/i.test(origin || "");
+
+      if (!origin || allowedOrigins.includes(origin) || isLocalhostOrigin) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
@@ -82,6 +95,7 @@ app.use("/api/gallery", require("./routes/gallery"));
 app.use("/api/announcements", require("./routes/announcements"));
 app.use("/api/careers", require("./routes/careers"));
 app.use("/api/blogs", require("./routes/blogs"));
+app.use("/api/videos", require("./routes/videos"));
 
 /* ===================== 404 HANDLER ===================== */
 app.use((req, res) => {
