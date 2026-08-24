@@ -3,46 +3,31 @@ const mongoose = require('mongoose');
 const videoSchema = new mongoose.Schema({
   title: {
     type: String,
-    required: true,
-    trim: true
+    required: [true, 'Title is required'],
+    trim: true,
   },
   description: {
     type: String,
-    required: true
+    default: '',
   },
   videoUrl: {
     type: String,
-    required: true
+    required: [true, 'Video URL is required'],
   },
   thumbnail: {
     type: String,
-    required: true
+    default: '',
   },
-  duration: {
-    type: String,
-    default: '5:00'
-  },
-  isPublished: {
-    type: Boolean,
-    default: true
-  },
-  views: {
+  order: {
     type: Number,
-    default: 0
+    default: 0,
   },
-  createdAt: {
-    type: Date,
-    default: Date.now
+  isActive: {
+    type: Boolean,
+    default: true,
   },
-  updatedAt: {
-    type: Date,
-    default: Date.now
-  }
-});
-
-videoSchema.pre('save', function(next) {
-  this.updatedAt = Date.now();
-  next();
+}, {
+  timestamps: true,
 });
 
 module.exports = mongoose.model('Video', videoSchema);
