@@ -96,8 +96,8 @@ app.use("/api/announcements", require("./routes/announcements"));
 app.use("/api/careers", require("./routes/careers"));
 // Add these after your existing routes
 app.use("/api/videos", require("./routes/videos"));
-app.use("/api/blogs", require("./routes/blogs"));
-
+// In your server.js, ensure this line exists:
+app.use("/api/blogs", require("./routes/blogs")); // Change from /api/blog to /api/blogs
 /* ===================== 404 HANDLER ===================== */
 app.use((req, res) => {
   res.status(404).json({
