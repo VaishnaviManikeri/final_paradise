@@ -55,21 +55,22 @@ const blogSchema = new mongoose.Schema({
   }
 });
 
-// Update timestamp on save
-blogSchema.pre('save', function(next) {
-  this.updatedAt = Date.now();
-  next();
-});
-
-// Generate slug from title
-blogSchema.pre('save', function(next) {
-  if (this.isModified('title')) {
+// Generate slug from title BEFORE validation
+blogSchema.pre('validate', function(next) {
+  if (this.isModified('title') && this.title) {
     this.slug = this.title
       .toLowerCase()
       .replace(/[^a-zA-Z0-9 ]/g, '')
       .replace(/\s+/g, '-')
-      .replace(/-+/g, '-');
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
   }
+  next();
+});
+
+// Update timestamp on save
+blogSchema.pre('save', function(next) {
+  this.updatedAt = Date.now();
   next();
 });
 
