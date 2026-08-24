@@ -1,212 +1,133 @@
-const Blog = require('../models/Blog');
-const fs = require('fs');
-const path = require('path');
+const Blog = require("../models/Blog");
+const fs = require("fs");
+const path = require("path");
 
-// Get all blogs
-exports.getAllBlogs = async (req, res) => {
+const removeFile = (filePath) => {
+  if (!filePath) return;
+  const fullPath = path.join(__dirname, "..", filePath);
+  fs.unlink(fullPath, (err) => {
+    if (err && err.code !== "ENOENT") console.error("File delete error:", err.message);
+  });
+};
+
+// GET /api/blog  (public - published only)
+exports.getPublishedBlogs = async (req, res) => {
+  try {
+    const blogs = await Blog.find({ published: true })
+      .select("-content")
+      .sort({ createdAt: -1 });
+    res.status(200).json({ success: true, data: blogs });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// GET /api/blog/admin  (protected - all blogs)
+exports.getAllBlogsAdmin = async (req, res) => {
   try {
     const blogs = await Blog.find().sort({ createdAt: -1 });
-    res.status(200).json({
-      success: true,
-      data: blogs,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching blogs',
-      error: error.message,
-    });
+    res.status(200).json({ success: true, data: blogs });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// Get single blog by slug
+// GET /api/blog/:slug  (public - single blog)
 exports.getBlogBySlug = async (req, res) => {
   try {
-    const blog = await Blog.findOne({ slug: req.params.slug });
+    const blog = await Blog.findOne({ slug: req.params.slug, published: true });
     if (!blog) {
-      return res.status(404).json({
-        success: false,
-        message: 'Blog not found',
-      });
+      return res.status(404).json({ success: false, message: "Blog not found" });
     }
-    // Increment views
-    blog.views += 1;
-    await blog.save();
-    res.status(200).json({
-      success: true,
-      data: blog,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching blog',
-      error: error.message,
-    });
+    res.status(200).json({ success: true, data: blog });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// Get single blog by ID
+// GET /api/blog/id/:id  (protected - single blog for editing, any status)
 exports.getBlogById = async (req, res) => {
   try {
     const blog = await Blog.findById(req.params.id);
     if (!blog) {
-      return res.status(404).json({
-        success: false,
-        message: 'Blog not found',
-      });
+      return res.status(404).json({ success: false, message: "Blog not found" });
     }
-    res.status(200).json({
-      success: true,
-      data: blog,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching blog',
-      error: error.message,
-    });
+    res.status(200).json({ success: true, data: blog });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// Create blog
+// POST /api/blog  (protected)
 exports.createBlog = async (req, res) => {
   try {
-    const { title, author, content, excerpt, metaTitle, metaDescription, featuredImage, readingTime, tags, isPublished } = req.body;
-    
-    // Validate required fields
-    if (!title || !author || !content || !excerpt) {
-      return res.status(400).json({
-        success: false,
-        message: 'Title, author, content, and excerpt are required',
-      });
-    }
+    const { title, author, excerpt, content, metaTitle, metaDescription, published, coverImageAlt } = req.body;
 
-    // Generate slug from title if not provided in request
-    let slug = req.body.slug || title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
-
-    // Check if slug already exists
-    const existingBlog = await Blog.findOne({ slug });
-    if (existingBlog) {
-      slug = `${slug}-${Date.now().toString(36)}`;
+    if (!title || !content) {
+      return res.status(400).json({ success: false, message: "Title and content are required" });
     }
 
     const blog = new Blog({
       title,
-      slug,
       author,
-      content,
       excerpt,
-      metaTitle: metaTitle || title,
-      metaDescription: metaDescription || excerpt,
-      featuredImage: featuredImage || '',
-      readingTime: readingTime || '5 min read',
-      tags: tags || [],
-      isPublished: isPublished !== undefined ? isPublished : true,
+      content,
+      metaTitle,
+      metaDescription,
+      coverImageAlt,
+      published: published === "false" ? false : true,
+      coverImage: req.file ? `/uploads/blog/${req.file.filename}` : "",
     });
 
     await blog.save();
-    res.status(201).json({
-      success: true,
-      message: 'Blog created successfully',
-      data: blog,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error creating blog',
-      error: error.message,
-    });
+    res.status(201).json({ success: true, data: blog });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// Update blog
+// PUT /api/blog/:id  (protected)
 exports.updateBlog = async (req, res) => {
   try {
-    const { title, author, content, excerpt, metaTitle, metaDescription, featuredImage, readingTime, tags, isPublished } = req.body;
     const blog = await Blog.findById(req.params.id);
-
     if (!blog) {
-      return res.status(404).json({
-        success: false,
-        message: 'Blog not found',
-      });
+      return res.status(404).json({ success: false, message: "Blog not found" });
     }
 
-    // Update fields
-    blog.title = title || blog.title;
-    blog.author = author || blog.author;
-    blog.content = content || blog.content;
-    blog.excerpt = excerpt || blog.excerpt;
-    blog.metaTitle = metaTitle || blog.metaTitle;
-    blog.metaDescription = metaDescription || blog.metaDescription;
-    blog.featuredImage = featuredImage !== undefined ? featuredImage : blog.featuredImage;
-    blog.readingTime = readingTime || blog.readingTime;
-    blog.tags = tags || blog.tags;
-    blog.isPublished = isPublished !== undefined ? isPublished : blog.isPublished;
-    blog.updatedAt = Date.now();
+    const { title, author, excerpt, content, metaTitle, metaDescription, published, coverImageAlt } = req.body;
 
-    // Update slug if title changed
-    if (title && title !== blog.title) {
-      let newSlug = title
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '');
-      
-      // Check if new slug already exists
-      const existingBlog = await Blog.findOne({ slug: newSlug, _id: { $ne: blog._id } });
-      if (existingBlog) {
-        newSlug = `${newSlug}-${Date.now().toString(36)}`;
-      }
-      blog.slug = newSlug;
+    if (title !== undefined) blog.title = title;
+    if (author !== undefined) blog.author = author;
+    if (excerpt !== undefined) blog.excerpt = excerpt;
+    if (content !== undefined) blog.content = content;
+    if (metaTitle !== undefined) blog.metaTitle = metaTitle;
+    if (metaDescription !== undefined) blog.metaDescription = metaDescription;
+    if (coverImageAlt !== undefined) blog.coverImageAlt = coverImageAlt;
+    if (published !== undefined) blog.published = published === "false" ? false : true;
+
+    if (req.file) {
+      removeFile(blog.coverImage);
+      blog.coverImage = `/uploads/blog/${req.file.filename}`;
     }
 
     await blog.save();
-    res.status(200).json({
-      success: true,
-      message: 'Blog updated successfully',
-      data: blog,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error updating blog',
-      error: error.message,
-    });
+    res.status(200).json({ success: true, data: blog });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// Delete blog
+// DELETE /api/blog/:id  (protected)
 exports.deleteBlog = async (req, res) => {
   try {
     const blog = await Blog.findById(req.params.id);
     if (!blog) {
-      return res.status(404).json({
-        success: false,
-        message: 'Blog not found',
-      });
+      return res.status(404).json({ success: false, message: "Blog not found" });
     }
-
-    // Delete featured image if exists
-    if (blog.featuredImage) {
-      const imagePath = path.join(__dirname, '../uploads', path.basename(blog.featuredImage));
-      if (fs.existsSync(imagePath)) {
-        fs.unlinkSync(imagePath);
-      }
-    }
-
+    removeFile(blog.coverImage);
     await blog.deleteOne();
-    res.status(200).json({
-      success: true,
-      message: 'Blog deleted successfully',
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error deleting blog',
-      error: error.message,
-    });
+    res.status(200).json({ success: true, message: "Blog deleted" });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 };
