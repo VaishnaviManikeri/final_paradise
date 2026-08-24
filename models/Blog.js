@@ -1,79 +1,55 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
-const blogSchema = new mongoose.Schema({
-  title: {
-    type: String,
-    required: true,
-    trim: true,
-  },
-  slug: {
-    type: String,
-    required: true,
-    unique: true,
-    trim: true,
-  },
-  metaTitle: {
-    type: String,
-    trim: true,
-  },
-  metaDescription: {
-    type: String,
-    trim: true,
-  },
-  author: {
-    type: String,
-    required: true,
-    trim: true,
-  },
-  content: {
-    type: String,
-    required: true,
-  },
-  excerpt: {
-    type: String,
-    required: true,
-    trim: true,
-  },
-  featuredImage: {
-    type: String,
-    default: '',
-  },
-  readingTime: {
-    type: String,
-    default: '5 min read',
-  },
-  isPublished: {
-    type: Boolean,
-    default: true,
-  },
-  tags: [{
-    type: String,
-    trim: true,
-  }],
-  views: {
-    type: Number,
-    default: 0,
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now,
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now,
-  },
-});
+const slugify = (text) =>
+  text
+    .toString()
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, "")
+    .replace(/[\s_-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 
-// Pre-save middleware to generate slug if not provided
-blogSchema.pre('save', function(next) {
-  if (!this.slug) {
-    this.slug = this.title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
+const blogSchema = new mongoose.Schema(
+  {
+    title: { type: String, required: true, trim: true },
+    slug: { type: String, required: true, unique: true, index: true },
+    author: { type: String, default: "Admin" },
+    excerpt: { type: String, default: "" },
+    content: { type: String, required: true }, // rich text HTML from editor
+    coverImage: { type: String, default: "" },
+    coverImageAlt: { type: String, default: "" },
+    metaTitle: { type: String, default: "" },
+    metaDescription: { type: String, default: "" },
+    readingTime: { type: Number, default: 1 }, // minutes
+    published: { type: Boolean, default: true },
+  },
+  { timestamps: true }
+);
+
+// Auto-generate slug + reading time before saving
+blogSchema.pre("validate", async function (next) {
+  if (this.isModified("title") || !this.slug) {
+    let baseSlug = slugify(this.title);
+    let slug = baseSlug;
+    let counter = 1;
+
+    // ensure uniqueness
+    const Blog = mongoose.model("Blog");
+    while (
+      await Blog.findOne({ slug, _id: { $ne: this._id } }).lean()
+    ) {
+      slug = `${baseSlug}-${counter++}`;
+    }
+    this.slug = slug;
   }
-  this.updatedAt = Date.now();
+
+  if (this.isModified("content")) {
+    const plainText = this.content.replace(/<[^>]*>/g, " ");
+    const wordCount = plainText.trim().split(/\s+/).filter(Boolean).length;
+    this.readingTime = Math.max(1, Math.ceil(wordCount / 200));
+  }
+
   next();
 });
 
-module.exports = mongoose.model('Blog', blogSchema);
+module.exports = mongoose.model("Blog", blogSchema);
