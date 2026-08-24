@@ -3,27 +3,36 @@ const mongoose = require('mongoose');
 const blogSchema = new mongoose.Schema({
   title: {
     type: String,
-    required: [true, 'Title is required'],
+    required: true,
     trim: true,
   },
   slug: {
     type: String,
-    required: [true, 'Slug is required'],
+    required: true,
     unique: true,
     trim: true,
-    lowercase: true,
   },
-  content: {
+  metaTitle: {
     type: String,
-    required: [true, 'Content is required'],
+    trim: true,
   },
-  excerpt: {
+  metaDescription: {
     type: String,
-    maxlength: 200,
+    trim: true,
   },
   author: {
     type: String,
-    default: 'Paradise EMS',
+    required: true,
+    trim: true,
+  },
+  content: {
+    type: String,
+    required: true,
+  },
+  excerpt: {
+    type: String,
+    required: true,
+    trim: true,
   },
   featuredImage: {
     type: String,
@@ -33,38 +42,37 @@ const blogSchema = new mongoose.Schema({
     type: String,
     default: '5 min read',
   },
-  tags: [{
-    type: String,
-    trim: true,
-  }],
   isPublished: {
     type: Boolean,
     default: true,
   },
+  tags: [{
+    type: String,
+    trim: true,
+  }],
   views: {
     type: Number,
     default: 0,
   },
-  metaTitle: {
-    type: String,
-    default: '',
+  createdAt: {
+    type: Date,
+    default: Date.now,
   },
-  metaDescription: {
-    type: String,
-    default: '',
+  updatedAt: {
+    type: Date,
+    default: Date.now,
   },
-}, {
-  timestamps: true,
 });
 
-// Auto-generate slug from title
+// Pre-save middleware to generate slug if not provided
 blogSchema.pre('save', function(next) {
-  if (this.isModified('title') && !this.slug) {
+  if (!this.slug) {
     this.slug = this.title
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '');
+      .replace(/^-+|-+$/g, '');
   }
+  this.updatedAt = Date.now();
   next();
 });
 
