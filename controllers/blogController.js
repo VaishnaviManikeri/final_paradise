@@ -1,41 +1,25 @@
 const Blog = require('../models/Blog');
+const fs = require('fs');
+const path = require('path');
 
-// @desc    Get all blogs
-// @route   GET /api/blogs
-// @access  Public
-exports.getBlogs = async (req, res) => {
+// Get all blogs
+exports.getAllBlogs = async (req, res) => {
   try {
-    const { limit = 50, skip = 0, published = true } = req.query;
-    
-    const query = {};
-    if (published !== undefined) {
-      query.isPublished = published === 'true' || published === true;
-    }
-    
-    const blogs = await Blog.find(query)
-      .sort({ createdAt: -1 })
-      .limit(parseInt(limit))
-      .skip(parseInt(skip));
-
-    const total = await Blog.countDocuments(query);
-
+    const blogs = await Blog.find().sort({ createdAt: -1 });
     res.status(200).json({
       success: true,
-      count: blogs.length,
-      total,
       data: blogs,
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message,
+      message: 'Error fetching blogs',
+      error: error.message,
     });
   }
 };
 
-// @desc    Get single blog by slug
-// @route   GET /api/blogs/:slug
-// @access  Public
+// Get single blog by slug
 exports.getBlogBySlug = async (req, res) => {
   try {
     const blog = await Blog.findOne({ slug: req.params.slug });
@@ -45,11 +29,9 @@ exports.getBlogBySlug = async (req, res) => {
         message: 'Blog not found',
       });
     }
-
     // Increment views
     blog.views += 1;
     await blog.save();
-
     res.status(200).json({
       success: true,
       data: blog,
@@ -57,14 +39,13 @@ exports.getBlogBySlug = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message,
+      message: 'Error fetching blog',
+      error: error.message,
     });
   }
 };
 
-// @desc    Get single blog by ID
-// @route   GET /api/blogs/id/:id
-// @access  Private
+// Get single blog by ID
 exports.getBlogById = async (req, res) => {
   try {
     const blog = await Blog.findById(req.params.id);
@@ -74,7 +55,6 @@ exports.getBlogById = async (req, res) => {
         message: 'Blog not found',
       });
     }
-
     res.status(200).json({
       success: true,
       data: blog,
@@ -82,92 +62,72 @@ exports.getBlogById = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message,
+      message: 'Error fetching blog',
+      error: error.message,
     });
   }
 };
 
-// @desc    Create blog
-// @route   POST /api/blogs
-// @access  Private
+// Create blog
 exports.createBlog = async (req, res) => {
   try {
-    const { 
-      title, 
-      content, 
-      excerpt, 
-      author, 
-      featuredImage, 
-      tags, 
-      isPublished,
-      metaTitle,
-      metaDescription 
-    } = req.body;
+    const { title, author, content, excerpt, metaTitle, metaDescription, featuredImage, readingTime, tags, isPublished } = req.body;
+    
+    // Validate required fields
+    if (!title || !author || !content || !excerpt) {
+      return res.status(400).json({
+        success: false,
+        message: 'Title, author, content, and excerpt are required',
+      });
+    }
 
-    // Generate slug
-    const slug = title
+    // Generate slug from title if not provided in request
+    let slug = req.body.slug || title
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '');
+      .replace(/^-+|-+$/g, '');
 
     // Check if slug already exists
     const existingBlog = await Blog.findOne({ slug });
     if (existingBlog) {
-      return res.status(400).json({
-        success: false,
-        message: 'A blog with similar title already exists',
-      });
+      slug = `${slug}-${Date.now().toString(36)}`;
     }
 
-    // Calculate reading time
-    const wordCount = content.replace(/<[^>]*>/g, '').split(/\s+/).length;
-    const readingTime = Math.ceil(wordCount / 200);
-    const readingTimeText = readingTime <= 1 ? '1 min read' : `${readingTime} min read`;
-
-    const blog = await Blog.create({
+    const blog = new Blog({
       title,
       slug,
+      author,
       content,
-      excerpt: excerpt || content.replace(/<[^>]*>/g, '').substring(0, 200),
-      author: author || 'Paradise EMS',
+      excerpt,
+      metaTitle: metaTitle || title,
+      metaDescription: metaDescription || excerpt,
       featuredImage: featuredImage || '',
+      readingTime: readingTime || '5 min read',
       tags: tags || [],
       isPublished: isPublished !== undefined ? isPublished : true,
-      readingTime: readingTimeText,
-      metaTitle: metaTitle || title,
-      metaDescription: metaDescription || excerpt || content.replace(/<[^>]*>/g, '').substring(0, 160),
     });
 
+    await blog.save();
     res.status(201).json({
       success: true,
+      message: 'Blog created successfully',
       data: blog,
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message,
+      message: 'Error creating blog',
+      error: error.message,
     });
   }
 };
 
-// @desc    Update blog
-// @route   PUT /api/blogs/:id
-// @access  Private
+// Update blog
 exports.updateBlog = async (req, res) => {
   try {
-    const { 
-      title, 
-      content, 
-      excerpt, 
-      author, 
-      featuredImage, 
-      tags, 
-      isPublished,
-      metaTitle,
-      metaDescription 
-    } = req.body;
+    const { title, author, content, excerpt, metaTitle, metaDescription, featuredImage, readingTime, tags, isPublished } = req.body;
+    const blog = await Blog.findById(req.params.id);
 
-    let blog = await Blog.findById(req.params.id);
     if (!blog) {
       return res.status(404).json({
         success: false,
@@ -175,61 +135,50 @@ exports.updateBlog = async (req, res) => {
       });
     }
 
-    // Update slug if title changed
-    let slug = blog.slug;
-    if (title && title !== blog.title) {
-      slug = title
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-|-$/g, '');
-      
-      // Check if new slug already exists
-      const existingBlog = await Blog.findOne({ slug, _id: { $ne: req.params.id } });
-      if (existingBlog) {
-        return res.status(400).json({
-          success: false,
-          message: 'A blog with similar title already exists',
-        });
-      }
-    }
-
-    // Update reading time if content changed
-    let readingTime = blog.readingTime;
-    if (content && content !== blog.content) {
-      const wordCount = content.replace(/<[^>]*>/g, '').split(/\s+/).length;
-      const minutes = Math.ceil(wordCount / 200);
-      readingTime = minutes <= 1 ? '1 min read' : `${minutes} min read`;
-    }
-
+    // Update fields
     blog.title = title || blog.title;
-    blog.slug = slug;
-    blog.content = content || blog.content;
-    blog.excerpt = excerpt !== undefined ? excerpt : blog.excerpt;
     blog.author = author || blog.author;
-    blog.featuredImage = featuredImage !== undefined ? featuredImage : blog.featuredImage;
-    blog.tags = tags || blog.tags;
-    blog.isPublished = isPublished !== undefined ? isPublished : blog.isPublished;
-    blog.readingTime = readingTime;
+    blog.content = content || blog.content;
+    blog.excerpt = excerpt || blog.excerpt;
     blog.metaTitle = metaTitle || blog.metaTitle;
     blog.metaDescription = metaDescription || blog.metaDescription;
+    blog.featuredImage = featuredImage !== undefined ? featuredImage : blog.featuredImage;
+    blog.readingTime = readingTime || blog.readingTime;
+    blog.tags = tags || blog.tags;
+    blog.isPublished = isPublished !== undefined ? isPublished : blog.isPublished;
+    blog.updatedAt = Date.now();
+
+    // Update slug if title changed
+    if (title && title !== blog.title) {
+      let newSlug = title
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+      
+      // Check if new slug already exists
+      const existingBlog = await Blog.findOne({ slug: newSlug, _id: { $ne: blog._id } });
+      if (existingBlog) {
+        newSlug = `${newSlug}-${Date.now().toString(36)}`;
+      }
+      blog.slug = newSlug;
+    }
 
     await blog.save();
-
     res.status(200).json({
       success: true,
+      message: 'Blog updated successfully',
       data: blog,
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message,
+      message: 'Error updating blog',
+      error: error.message,
     });
   }
 };
 
-// @desc    Delete blog
-// @route   DELETE /api/blogs/:id
-// @access  Private
+// Delete blog
 exports.deleteBlog = async (req, res) => {
   try {
     const blog = await Blog.findById(req.params.id);
@@ -240,16 +189,24 @@ exports.deleteBlog = async (req, res) => {
       });
     }
 
-    await blog.deleteOne();
+    // Delete featured image if exists
+    if (blog.featuredImage) {
+      const imagePath = path.join(__dirname, '../uploads', path.basename(blog.featuredImage));
+      if (fs.existsSync(imagePath)) {
+        fs.unlinkSync(imagePath);
+      }
+    }
 
+    await blog.deleteOne();
     res.status(200).json({
       success: true,
-      data: {},
+      message: 'Blog deleted successfully',
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message,
+      message: 'Error deleting blog',
+      error: error.message,
     });
   }
 };
