@@ -1,150 +1,123 @@
-const Video = require('../models/Video');
-const fs = require('fs');
-const path = require('path');
+const Video = require("../models/Video");
+const fs = require("fs");
+const path = require("path");
 
-// Get all videos
+const removeFile = (filePath) => {
+  if (!filePath) return;
+  const fullPath = path.join(__dirname, "..", filePath);
+  fs.unlink(fullPath, (err) => {
+    if (err && err.code !== "ENOENT") console.error("File delete error:", err.message);
+  });
+};
+
+// GET /api/videos  (public)
 exports.getAllVideos = async (req, res) => {
   try {
-    const videos = await Video.find().sort({ createdAt: -1 });
-    res.status(200).json({
-      success: true,
-      data: videos,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching videos',
-      error: error.message,
-    });
+    const videos = await Video.find({ published: true }).sort({ createdAt: -1 });
+    res.status(200).json({ success: true, data: videos });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// Get single video
-exports.getVideoById = async (req, res) => {
+// GET /api/videos/admin  (protected - all, including unpublished)
+exports.getAllVideosAdmin = async (req, res) => {
   try {
-    const video = await Video.findById(req.params.id);
-    if (!video) {
-      return res.status(404).json({
-        success: false,
-        message: 'Video not found',
-      });
-    }
-    // Increment views
-    video.views += 1;
-    await video.save();
-    res.status(200).json({
-      success: true,
-      data: video,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching video',
-      error: error.message,
-    });
+    const videos = await Video.find().sort({ createdAt: -1 });
+    res.status(200).json({ success: true, data: videos });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// Create video
+// POST /api/videos  (protected)
 exports.createVideo = async (req, res) => {
   try {
-    const { title, description, videoUrl, thumbnail, isActive } = req.body;
-    
-    // Validate required fields
-    if (!title || !description || !videoUrl) {
-      return res.status(400).json({
-        success: false,
-        message: 'Title, description, and video URL are required',
-      });
+    const { title, description, category, sourceType, videoUrl, published } = req.body;
+
+    if (!title || !sourceType) {
+      return res.status(400).json({ success: false, message: "Title and sourceType are required" });
+    }
+
+    if (sourceType === "youtube" && !videoUrl) {
+      return res.status(400).json({ success: false, message: "YouTube URL is required" });
+    }
+
+    if (sourceType === "upload" && !req.files?.video) {
+      return res.status(400).json({ success: false, message: "Video file is required" });
     }
 
     const video = new Video({
       title,
       description,
-      videoUrl,
-      thumbnail: thumbnail || '',
-      isActive: isActive !== undefined ? isActive : true,
+      category,
+      sourceType,
+      published: published === "false" ? false : true,
+      videoUrl:
+        sourceType === "youtube"
+          ? videoUrl
+          : `/uploads/videos/${req.files.video[0].filename}`,
+      thumbnail: req.files?.thumbnail ? `/uploads/videos/${req.files.thumbnail[0].filename}` : "",
     });
 
     await video.save();
-    res.status(201).json({
-      success: true,
-      message: 'Video created successfully',
-      data: video,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error creating video',
-      error: error.message,
-    });
+    res.status(201).json({ success: true, data: video });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// Update video
+// PUT /api/videos/:id  (protected)
 exports.updateVideo = async (req, res) => {
   try {
-    const { title, description, videoUrl, thumbnail, isActive } = req.body;
     const video = await Video.findById(req.params.id);
-
     if (!video) {
-      return res.status(404).json({
-        success: false,
-        message: 'Video not found',
-      });
+      return res.status(404).json({ success: false, message: "Video not found" });
     }
 
-    video.title = title || video.title;
-    video.description = description || video.description;
-    video.videoUrl = videoUrl || video.videoUrl;
-    video.thumbnail = thumbnail !== undefined ? thumbnail : video.thumbnail;
-    video.isActive = isActive !== undefined ? isActive : video.isActive;
-    video.updatedAt = Date.now();
+    const { title, description, category, sourceType, videoUrl, published } = req.body;
+
+    if (title !== undefined) video.title = title;
+    if (description !== undefined) video.description = description;
+    if (category !== undefined) video.category = category;
+    if (published !== undefined) video.published = published === "false" ? false : true;
+
+    if (sourceType === "youtube" && videoUrl) {
+      if (video.sourceType === "upload") removeFile(video.videoUrl);
+      video.sourceType = "youtube";
+      video.videoUrl = videoUrl;
+    }
+
+    if (req.files?.video) {
+      if (video.sourceType === "upload") removeFile(video.videoUrl);
+      video.sourceType = "upload";
+      video.videoUrl = `/uploads/videos/${req.files.video[0].filename}`;
+    }
+
+    if (req.files?.thumbnail) {
+      removeFile(video.thumbnail);
+      video.thumbnail = `/uploads/videos/${req.files.thumbnail[0].filename}`;
+    }
 
     await video.save();
-    res.status(200).json({
-      success: true,
-      message: 'Video updated successfully',
-      data: video,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error updating video',
-      error: error.message,
-    });
+    res.status(200).json({ success: true, data: video });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// Delete video
+// DELETE /api/videos/:id  (protected)
 exports.deleteVideo = async (req, res) => {
   try {
     const video = await Video.findById(req.params.id);
     if (!video) {
-      return res.status(404).json({
-        success: false,
-        message: 'Video not found',
-      });
+      return res.status(404).json({ success: false, message: "Video not found" });
     }
-
-    // Delete thumbnail if exists
-    if (video.thumbnail) {
-      const thumbnailPath = path.join(__dirname, '../uploads', path.basename(video.thumbnail));
-      if (fs.existsSync(thumbnailPath)) {
-        fs.unlinkSync(thumbnailPath);
-      }
-    }
-
+    if (video.sourceType === "upload") removeFile(video.videoUrl);
+    removeFile(video.thumbnail);
     await video.deleteOne();
-    res.status(200).json({
-      success: true,
-      message: 'Video deleted successfully',
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error deleting video',
-      error: error.message,
-    });
+    res.status(200).json({ success: true, message: "Video deleted" });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 };
