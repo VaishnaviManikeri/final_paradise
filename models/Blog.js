@@ -3,74 +3,68 @@ const mongoose = require('mongoose');
 const blogSchema = new mongoose.Schema({
   title: {
     type: String,
-    required: true,
-    trim: true
+    required: [true, 'Title is required'],
+    trim: true,
   },
   slug: {
     type: String,
-    required: true,
+    required: [true, 'Slug is required'],
     unique: true,
     trim: true,
-    lowercase: true
+    lowercase: true,
   },
-  description: {
+  content: {
     type: String,
-    required: true
+    required: [true, 'Content is required'],
+  },
+  excerpt: {
+    type: String,
+    maxlength: 200,
   },
   author: {
     type: String,
-    default: 'Paradise EMS'
+    default: 'Paradise EMS',
   },
   featuredImage: {
     type: String,
-    required: true
+    default: '',
   },
   readingTime: {
     type: String,
-    default: '5 min read'
+    default: '5 min read',
   },
-  metaTitle: {
+  tags: [{
     type: String,
-    trim: true
-  },
-  metaDescription: {
-    type: String,
-    trim: true
-  },
+    trim: true,
+  }],
   isPublished: {
     type: Boolean,
-    default: true
+    default: true,
   },
   views: {
     type: Number,
-    default: 0
+    default: 0,
   },
-  createdAt: {
-    type: Date,
-    default: Date.now
+  metaTitle: {
+    type: String,
+    default: '',
   },
-  updatedAt: {
-    type: Date,
-    default: Date.now
-  }
+  metaDescription: {
+    type: String,
+    default: '',
+  },
+}, {
+  timestamps: true,
 });
 
-// Generate slug from title BEFORE validation
-blogSchema.pre('validate', function(next) {
-  if (this.isModified('title') && this.title) {
+// Auto-generate slug from title
+blogSchema.pre('save', function(next) {
+  if (this.isModified('title') && !this.slug) {
     this.slug = this.title
       .toLowerCase()
-      .replace(/[^a-zA-Z0-9 ]/g, '')
-      .replace(/\s+/g, '-')
-      .replace(/-+/g, '-')
+      .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '');
   }
-  next();
-});
-
-// Update timestamp on save
-blogSchema.pre('save', function(next) {
-  this.updatedAt = Date.now();
   next();
 });
 
