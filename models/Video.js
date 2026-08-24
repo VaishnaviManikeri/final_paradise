@@ -1,39 +1,16 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
-const videoSchema = new mongoose.Schema({
-  title: {
-    type: String,
-    required: true,
-    trim: true,
+const videoSchema = new mongoose.Schema(
+  {
+    title: { type: String, required: true, trim: true },
+    description: { type: String, default: "" },
+    category: { type: String, default: "General" },
+    sourceType: { type: String, enum: ["youtube", "upload"], required: true },
+    videoUrl: { type: String, default: "" }, // youtube link OR /uploads/videos/xxx path
+    thumbnail: { type: String, default: "" },
+    published: { type: Boolean, default: true },
   },
-  description: {
-    type: String,
-    required: true,
-  },
-  videoUrl: {
-    type: String,
-    required: true,
-  },
-  thumbnail: {
-    type: String,
-    default: '',
-  },
-  isActive: {
-    type: Boolean,
-    default: true,
-  },
-  views: {
-    type: Number,
-    default: 0,
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now,
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now,
-  },
-});
+  { timestamps: true }
+);
 
-module.exports = mongoose.model('Video', videoSchema);
+module.exports = mongoose.model("Video", videoSchema);
