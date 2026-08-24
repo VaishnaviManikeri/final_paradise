@@ -37,14 +37,16 @@ const upload = multer({
 });
 
 /* ===== routes ===== */
-// Public
+// IMPORTANT: Place specific routes BEFORE parameterized routes
+// Admin routes first (they have specific paths)
+router.get("/admin/all", authMiddleware, getAllBlogsAdmin);
+router.get("/admin/id/:id", authMiddleware, getBlogById);
+
+// Then public routes with parameters
 router.get("/", getPublishedBlogs);
 router.get("/:slug", getBlogBySlug);
 
-// Protected (admin) - registered BEFORE the public "/:slug" would normally
-// shadow these, so we mount them under distinct sub-paths instead.
-router.get("/admin/all", authMiddleware, getAllBlogsAdmin);
-router.get("/admin/id/:id", authMiddleware, getBlogById);
+// CRUD operations (these are specific paths that won't conflict)
 router.post("/", authMiddleware, upload.single("coverImage"), createBlog);
 router.put("/:id", authMiddleware, upload.single("coverImage"), updateBlog);
 router.delete("/:id", authMiddleware, deleteBlog);
