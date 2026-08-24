@@ -51,14 +51,33 @@ exports.createBlog = async (req, res) => {
       return res.status(400).json({ error: 'Featured image is required' });
     }
 
+    // Generate slug from title
+    let slug = title
+      .toLowerCase()
+      .replace(/[^a-zA-Z0-9 ]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+
+    // Check if slug already exists and make it unique
+    let uniqueSlug = slug;
+    let counter = 1;
+    while (true) {
+      const existing = await Blog.findOne({ slug: uniqueSlug });
+      if (!existing) break;
+      uniqueSlug = `${slug}-${counter}`;
+      counter++;
+    }
+
     const blog = new Blog({
       title,
+      slug: uniqueSlug,
       description,
       author: author || 'Paradise EMS',
       featuredImage: `/uploads/blogs/${req.file.filename}`,
       readingTime: readingTime || '5 min read',
       metaTitle: metaTitle || title,
-      metaDescription: metaDescription || description.substring(0, 160)
+      metaDescription: metaDescription || description.substring(0, 160).replace(/<[^>]*>/g, '')
     });
 
     await blog.save();
@@ -66,7 +85,11 @@ exports.createBlog = async (req, res) => {
   } catch (error) {
     // Remove uploaded file if error
     if (req.file) {
-      fs.unlinkSync(req.file.path);
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (unlinkError) {
+        console.error('Error deleting file:', unlinkError);
+      }
     }
     res.status(500).json({ error: error.message });
   }
@@ -83,7 +106,28 @@ exports.updateBlog = async (req, res) => {
     const { title, description, author, readingTime, metaTitle, metaDescription } = req.body;
 
     // Update fields
-    blog.title = title || blog.title;
+    if (title && title !== blog.title) {
+      blog.title = title;
+      // Regenerate slug
+      let slug = title
+        .toLowerCase()
+        .replace(/[^a-zA-Z0-9 ]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '');
+
+      // Check if slug already exists (excluding current blog)
+      let uniqueSlug = slug;
+      let counter = 1;
+      while (true) {
+        const existing = await Blog.findOne({ slug: uniqueSlug, _id: { $ne: blog._id } });
+        if (!existing) break;
+        uniqueSlug = `${slug}-${counter}`;
+        counter++;
+      }
+      blog.slug = uniqueSlug;
+    }
+    
     blog.description = description || blog.description;
     blog.author = author || blog.author;
     blog.readingTime = readingTime || blog.readingTime;
@@ -96,7 +140,11 @@ exports.updateBlog = async (req, res) => {
       if (blog.featuredImage) {
         const oldPath = path.join(__dirname, '..', blog.featuredImage);
         if (fs.existsSync(oldPath)) {
-          fs.unlinkSync(oldPath);
+          try {
+            fs.unlinkSync(oldPath);
+          } catch (unlinkError) {
+            console.error('Error deleting old file:', unlinkError);
+          }
         }
       }
       blog.featuredImage = `/uploads/blogs/${req.file.filename}`;
@@ -107,7 +155,11 @@ exports.updateBlog = async (req, res) => {
   } catch (error) {
     // Remove uploaded file if error
     if (req.file) {
-      fs.unlinkSync(req.file.path);
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (unlinkError) {
+        console.error('Error deleting file:', unlinkError);
+      }
     }
     res.status(500).json({ error: error.message });
   }
@@ -125,7 +177,11 @@ exports.deleteBlog = async (req, res) => {
     if (blog.featuredImage) {
       const imagePath = path.join(__dirname, '..', blog.featuredImage);
       if (fs.existsSync(imagePath)) {
-        fs.unlinkSync(imagePath);
+        try {
+          fs.unlinkSync(imagePath);
+        } catch (unlinkError) {
+          console.error('Error deleting file:', unlinkError);
+        }
       }
     }
 
