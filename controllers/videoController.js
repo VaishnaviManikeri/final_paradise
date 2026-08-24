@@ -2,29 +2,25 @@ const Video = require('../models/Video');
 const fs = require('fs');
 const path = require('path');
 
-// @desc    Get all videos
-// @route   GET /api/videos
-// @access  Public
-exports.getVideos = async (req, res) => {
+// Get all videos
+exports.getAllVideos = async (req, res) => {
   try {
-    const videos = await Video.find().sort({ order: 1, createdAt: -1 });
+    const videos = await Video.find().sort({ createdAt: -1 });
     res.status(200).json({
       success: true,
-      count: videos.length,
       data: videos,
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message,
+      message: 'Error fetching videos',
+      error: error.message,
     });
   }
 };
 
-// @desc    Get single video
-// @route   GET /api/videos/:id
-// @access  Public
-exports.getVideo = async (req, res) => {
+// Get single video
+exports.getVideoById = async (req, res) => {
   try {
     const video = await Video.findById(req.params.id);
     if (!video) {
@@ -33,6 +29,9 @@ exports.getVideo = async (req, res) => {
         message: 'Video not found',
       });
     }
+    // Increment views
+    video.views += 1;
+    await video.save();
     res.status(200).json({
       success: true,
       data: video,
@@ -40,47 +39,54 @@ exports.getVideo = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message,
+      message: 'Error fetching video',
+      error: error.message,
     });
   }
 };
 
-// @desc    Create video
-// @route   POST /api/videos
-// @access  Private
+// Create video
 exports.createVideo = async (req, res) => {
   try {
-    const { title, description, videoUrl, thumbnail, order, isActive } = req.body;
+    const { title, description, videoUrl, thumbnail, isActive } = req.body;
     
-    const video = await Video.create({
+    // Validate required fields
+    if (!title || !description || !videoUrl) {
+      return res.status(400).json({
+        success: false,
+        message: 'Title, description, and video URL are required',
+      });
+    }
+
+    const video = new Video({
       title,
       description,
       videoUrl,
-      thumbnail,
-      order: order || 0,
+      thumbnail: thumbnail || '',
       isActive: isActive !== undefined ? isActive : true,
     });
 
+    await video.save();
     res.status(201).json({
       success: true,
+      message: 'Video created successfully',
       data: video,
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message,
+      message: 'Error creating video',
+      error: error.message,
     });
   }
 };
 
-// @desc    Update video
-// @route   PUT /api/videos/:id
-// @access  Private
+// Update video
 exports.updateVideo = async (req, res) => {
   try {
-    const { title, description, videoUrl, thumbnail, order, isActive } = req.body;
-    
-    let video = await Video.findById(req.params.id);
+    const { title, description, videoUrl, thumbnail, isActive } = req.body;
+    const video = await Video.findById(req.params.id);
+
     if (!video) {
       return res.status(404).json({
         success: false,
@@ -89,29 +95,28 @@ exports.updateVideo = async (req, res) => {
     }
 
     video.title = title || video.title;
-    video.description = description !== undefined ? description : video.description;
+    video.description = description || video.description;
     video.videoUrl = videoUrl || video.videoUrl;
     video.thumbnail = thumbnail !== undefined ? thumbnail : video.thumbnail;
-    video.order = order !== undefined ? order : video.order;
     video.isActive = isActive !== undefined ? isActive : video.isActive;
+    video.updatedAt = Date.now();
 
     await video.save();
-
     res.status(200).json({
       success: true,
+      message: 'Video updated successfully',
       data: video,
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message,
+      message: 'Error updating video',
+      error: error.message,
     });
   }
 };
 
-// @desc    Delete video
-// @route   DELETE /api/videos/:id
-// @access  Private
+// Delete video
 exports.deleteVideo = async (req, res) => {
   try {
     const video = await Video.findById(req.params.id);
@@ -122,16 +127,24 @@ exports.deleteVideo = async (req, res) => {
       });
     }
 
-    await video.deleteOne();
+    // Delete thumbnail if exists
+    if (video.thumbnail) {
+      const thumbnailPath = path.join(__dirname, '../uploads', path.basename(video.thumbnail));
+      if (fs.existsSync(thumbnailPath)) {
+        fs.unlinkSync(thumbnailPath);
+      }
+    }
 
+    await video.deleteOne();
     res.status(200).json({
       success: true,
-      data: {},
+      message: 'Video deleted successfully',
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message,
+      message: 'Error deleting video',
+      error: error.message,
     });
   }
 };
