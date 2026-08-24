@@ -1,22 +1,15 @@
 const express = require('express');
 const router = express.Router();
-const {
-  getVideos,
-  getVideo,
-  createVideo,
-  updateVideo,
-  deleteVideo,
-} = require('../controllers/videoController');
-
-const { protect } = require('../middleware/auth');
+const videoController = require('../controllers/videoController');
+const auth = require('../middleware/auth');
 
 // Public routes
-router.get('/', getVideos);
-router.get('/:id', getVideo);
+router.get('/', videoController.getAllVideos);
+router.get('/:id', videoController.getVideoById);
 
-// Protected routes
-router.post('/', protect, createVideo);
-router.put('/:id', protect, updateVideo);
-router.delete('/:id', protect, deleteVideo);
+// Protected routes (require authentication)
+router.post('/', auth, videoController.createVideo);
+router.put('/:id', auth, videoController.updateVideo);
+router.delete('/:id', auth, videoController.deleteVideo);
 
 module.exports = router;
