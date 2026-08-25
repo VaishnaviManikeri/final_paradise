@@ -3,13 +3,12 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const router = express.Router();
-
 const authMiddleware = require("../middleware/auth");
 const {
   getPublishedBlogs,
   getAllBlogsAdmin,
-  getBlogBySlug,
   getBlogById,
+  getBlogByIdAdmin,
   createBlog,
   updateBlog,
   deleteBlog,
@@ -18,7 +17,6 @@ const {
 /* ===== multer setup for cover image ===== */
 const uploadDir = path.join(__dirname, "..", "uploads", "blog");
 fs.mkdirSync(uploadDir, { recursive: true });
-
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadDir),
   filename: (req, file, cb) => {
@@ -26,7 +24,6 @@ const storage = multer.diskStorage({
     cb(null, `${unique}${path.extname(file.originalname)}`);
   },
 });
-
 const upload = multer({
   storage,
   limits: { fileSize: 5 * 1024 * 1024 },
@@ -40,14 +37,13 @@ const upload = multer({
 });
 
 // ===== ROUTES - ORDER MATTERS! =====
-
 // 1. Admin routes (specific paths first)
 router.get("/admin/all", authMiddleware, getAllBlogsAdmin);
-router.get("/admin/id/:id", authMiddleware, getBlogById);
+router.get("/admin/id/:id", authMiddleware, getBlogByIdAdmin);
 
 // 2. Public routes with parameters
 router.get("/", getPublishedBlogs);
-router.get("/:slug", getBlogBySlug);
+router.get("/:id", getBlogById);
 
 // 3. CRUD operations
 router.post("/", authMiddleware, upload.single("coverImage"), createBlog);
