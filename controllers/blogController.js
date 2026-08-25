@@ -48,7 +48,7 @@ exports.getBlogBySlug = async (req, res) => {
   }
 };
 
-// GET /api/blogs/admin/id/:id  (protected - single blog for editing, any status)
+// GET /api/blogs/admin/id/:id  (protected - single blog for editing)
 exports.getBlogById = async (req, res) => {
   try {
     const blog = await Blog.findById(req.params.id);
@@ -65,61 +65,103 @@ exports.getBlogById = async (req, res) => {
 // POST /api/blogs  (protected)
 exports.createBlog = async (req, res) => {
   try {
-    console.log("Create blog - body:", req.body);
-    console.log("Create blog - file:", req.file);
+    console.log("===== CREATE BLOG REQUEST =====");
+    console.log("Body:", req.body);
+    console.log("File:", req.file);
+    console.log("Headers:", req.headers['content-type']);
 
-    const { title, author, excerpt, content, metaTitle, metaDescription, published, coverImageAlt } = req.body;
+    // Extract form data
+    const { 
+      title, 
+      author, 
+      excerpt, 
+      content, 
+      metaTitle, 
+      metaDescription, 
+      published, 
+      coverImageAlt 
+    } = req.body;
 
-    if (!title || !content) {
-      return res.status(400).json({ success: false, message: "Title and content are required" });
+    // Validate required fields
+    if (!title || !title.trim()) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Title is required" 
+      });
     }
 
-    // Handle published field - convert string to boolean
-    let publishedValue = true;
-    if (published !== undefined) {
-      publishedValue = published === "false" ? false : Boolean(published);
+    if (!content || !content.trim() || content === '<p><br></p>') {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Content is required" 
+      });
     }
 
+    // Prepare blog data
     const blogData = {
       title: title.trim(),
       author: author || "Admin",
       excerpt: excerpt || "",
       content: content,
-      metaTitle: metaTitle || "",
-      metaDescription: metaDescription || "",
+      metaTitle: metaTitle || title.trim(),
+      metaDescription: metaDescription || excerpt || "",
       coverImageAlt: coverImageAlt || "",
-      published: publishedValue,
+      published: published === "false" ? false : Boolean(published),
     };
 
     // Add cover image if uploaded
     if (req.file) {
       blogData.coverImage = `/uploads/blog/${req.file.filename}`;
+      console.log("Cover image uploaded:", blogData.coverImage);
     }
 
+    // Create and save blog
     const blog = new Blog(blogData);
     await blog.save();
     
     console.log("Blog created successfully:", blog._id);
-    res.status(201).json({ success: true, data: blog });
+    console.log("Blog slug:", blog.slug);
+    
+    res.status(201).json({ 
+      success: true, 
+      data: blog,
+      message: "Blog created successfully" 
+    });
   } catch (err) {
     console.error("Error in createBlog:", err);
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ 
+      success: false, 
+      message: err.message || "Failed to create blog" 
+    });
   }
 };
 
 // PUT /api/blogs/:id  (protected)
 exports.updateBlog = async (req, res) => {
   try {
-    console.log("Update blog - id:", req.params.id);
-    console.log("Update blog - body:", req.body);
-    console.log("Update blog - file:", req.file);
+    console.log("===== UPDATE BLOG REQUEST =====");
+    console.log("ID:", req.params.id);
+    console.log("Body:", req.body);
+    console.log("File:", req.file);
 
     const blog = await Blog.findById(req.params.id);
     if (!blog) {
-      return res.status(404).json({ success: false, message: "Blog not found" });
+      return res.status(404).json({ 
+        success: false, 
+        message: "Blog not found" 
+      });
     }
 
-    const { title, author, excerpt, content, metaTitle, metaDescription, published, coverImageAlt } = req.body;
+    const { 
+      title, 
+      author, 
+      excerpt, 
+      content, 
+      metaTitle, 
+      metaDescription, 
+      published, 
+      coverImageAlt 
+    } = req.body;
 
     // Update fields
     if (title !== undefined && title !== null) blog.title = title.trim();
@@ -136,19 +178,27 @@ exports.updateBlog = async (req, res) => {
 
     // Handle cover image update
     if (req.file) {
-      // Remove old image if exists
       if (blog.coverImage) {
         removeFile(blog.coverImage);
       }
       blog.coverImage = `/uploads/blog/${req.file.filename}`;
+      console.log("Cover image updated:", blog.coverImage);
     }
 
     await blog.save();
     console.log("Blog updated successfully:", blog._id);
-    res.status(200).json({ success: true, data: blog });
+    
+    res.status(200).json({ 
+      success: true, 
+      data: blog,
+      message: "Blog updated successfully" 
+    });
   } catch (err) {
     console.error("Error in updateBlog:", err);
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ 
+      success: false, 
+      message: err.message || "Failed to update blog" 
+    });
   }
 };
 
@@ -157,19 +207,28 @@ exports.deleteBlog = async (req, res) => {
   try {
     const blog = await Blog.findById(req.params.id);
     if (!blog) {
-      return res.status(404).json({ success: false, message: "Blog not found" });
+      return res.status(404).json({ 
+        success: false, 
+        message: "Blog not found" 
+      });
     }
     
-    // Remove cover image if exists
     if (blog.coverImage) {
       removeFile(blog.coverImage);
     }
     
     await blog.deleteOne();
     console.log("Blog deleted successfully:", blog._id);
-    res.status(200).json({ success: true, message: "Blog deleted successfully" });
+    
+    res.status(200).json({ 
+      success: true, 
+      message: "Blog deleted successfully" 
+    });
   } catch (err) {
     console.error("Error in deleteBlog:", err);
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ 
+      success: false, 
+      message: err.message || "Failed to delete blog" 
+    });
   }
 };
