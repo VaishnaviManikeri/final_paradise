@@ -29,25 +29,27 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    if (/^image\/(jpe?g|png|webp|gif)$/i.test(file.mimetype)) cb(null, true);
-    else cb(new Error("Only image files are allowed"));
+    if (/^image\/(jpe?g|png|webp|gif)$/i.test(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only image files are allowed"));
+    }
   },
 });
 
-/* ===== routes ===== */
-// IMPORTANT: Place specific routes BEFORE parameterized routes
+// ===== ROUTES - ORDER MATTERS! =====
 
-// Admin routes (specific paths)
+// 1. Admin routes (specific paths first)
 router.get("/admin/all", authMiddleware, getAllBlogsAdmin);
 router.get("/admin/id/:id", authMiddleware, getBlogById);
 
-// Public routes with parameters
+// 2. Public routes with parameters
 router.get("/", getPublishedBlogs);
 router.get("/:slug", getBlogBySlug);
 
-// CRUD operations
+// 3. CRUD operations
 router.post("/", authMiddleware, upload.single("coverImage"), createBlog);
 router.put("/:id", authMiddleware, upload.single("coverImage"), updateBlog);
 router.delete("/:id", authMiddleware, deleteBlog);
