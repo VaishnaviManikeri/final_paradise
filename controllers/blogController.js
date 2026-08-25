@@ -123,6 +123,11 @@ exports.createBlog = async (req, res) => {
     let featuredImage = '';
     if (req.file) {
       featuredImage = `uploads/blogs/${req.file.filename}`;
+    } else {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Featured image is required' 
+      });
     }
 
     // Parse tags
@@ -131,11 +136,15 @@ exports.createBlog = async (req, res) => {
       if (Array.isArray(tags)) {
         tagsArray = tags;
       } else if (typeof tags === 'string') {
-        tagsArray = tags.split(',').map(t => t.trim()).filter(Boolean);
+        try {
+          tagsArray = JSON.parse(tags);
+        } catch {
+          tagsArray = tags.split(',').map(t => t.trim()).filter(Boolean);
+        }
       }
     }
 
-    const blog = new Blog({
+    const blogData = {
       title,
       description,
       excerpt: excerpt || '',
@@ -145,8 +154,9 @@ exports.createBlog = async (req, res) => {
       author: author || 'Paradise EMS',
       metaTitle: metaTitle || title,
       metaDescription: metaDescription || excerpt || ''
-    });
+    };
 
+    const blog = new Blog(blogData);
     await blog.save();
 
     res.status(201).json({
@@ -184,6 +194,20 @@ exports.updateBlog = async (req, res) => {
       blog.featuredImage = `uploads/blogs/${req.file.filename}`;
     }
 
+    // Parse tags
+    let tagsArray = blog.tags;
+    if (tags) {
+      if (Array.isArray(tags)) {
+        tagsArray = tags;
+      } else if (typeof tags === 'string') {
+        try {
+          tagsArray = JSON.parse(tags);
+        } catch {
+          tagsArray = tags.split(',').map(t => t.trim()).filter(Boolean);
+        }
+      }
+    }
+
     // Update fields
     blog.title = title || blog.title;
     blog.description = description || blog.description;
@@ -192,18 +216,10 @@ exports.updateBlog = async (req, res) => {
     blog.author = author || blog.author;
     blog.metaTitle = metaTitle || blog.metaTitle;
     blog.metaDescription = metaDescription || blog.metaDescription;
+    blog.tags = tagsArray;
     
     if (isPublished !== undefined) {
       blog.isPublished = isPublished;
-    }
-
-    // Parse tags
-    if (tags) {
-      if (Array.isArray(tags)) {
-        blog.tags = tags;
-      } else if (typeof tags === 'string') {
-        blog.tags = tags.split(',').map(t => t.trim()).filter(Boolean);
-      }
     }
 
     await blog.save();
@@ -245,22 +261,6 @@ exports.deleteBlog = async (req, res) => {
     });
   } catch (error) {
     console.error('Delete blog error:', error);
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-// @desc    Get blog categories
-// @route   GET /api/blogs/categories
-// @access  Public
-exports.getCategories = async (req, res) => {
-  try {
-    const categories = await Blog.distinct('category', { isPublished: true });
-    res.status(200).json({
-      success: true,
-      data: categories
-    });
-  } catch (error) {
-    console.error('Get categories error:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
