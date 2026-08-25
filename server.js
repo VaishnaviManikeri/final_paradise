@@ -10,6 +10,7 @@ dotenv.config();
 const app = express();
 
 /* ===================== CREATE UPLOAD DIRECTORIES ===================== */
+// Ensure upload directories exist
 const uploadDirs = [
   'uploads',
   'uploads/blogs',
@@ -43,7 +44,6 @@ app.use(
         "http://api.paradiseems.co.in",
       ];
 
-      // Allow all localhost ports for development
       const isLocalhostOrigin = /^http:\/\/(localhost|127\.0\.0\.1):\d+$/i.test(origin || "");
 
       if (!origin || allowedOrigins.includes(origin) || isLocalhostOrigin) {
@@ -65,17 +65,20 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 /* ===================== STATIC FILES ===================== */
-// Serve static files from uploads directory
+// IMPORTANT: This line serves static files from uploads directory
+// Files can be accessed via: http://yourdomain.com/uploads/filename.jpg
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-
-// Serve static files from public directory (if exists)
-const publicPath = path.join(__dirname, "public");
-if (fs.existsSync(publicPath)) {
-  app.use(express.static(publicPath));
-}
 
 // Log static file serving
 console.log(`✅ Serving static files from: ${path.join(__dirname, "uploads")}`);
+console.log(`📁 Uploads URL: /uploads`);
+
+// Serve static files from public directory if it exists
+const publicPath = path.join(__dirname, "public");
+if (fs.existsSync(publicPath)) {
+  app.use(express.static(publicPath));
+  console.log(`✅ Serving public files from: ${publicPath}`);
+}
 
 /* ===================== ROOT HEALTH CHECK ===================== */
 app.get("/", (req, res) => {
@@ -87,10 +90,15 @@ app.get("/", (req, res) => {
     port: process.env.PORT || 5014,
     time: new Date(),
     environment: process.env.NODE_ENV || "development",
+    staticFiles: {
+      uploads: "/uploads",
+      public: "/public"
+    }
   });
 });
 
 /* ===================== MAIN API HEALTH CHECK ===================== */
+/* THIS FIXES curl /api => Route not found */
 app.get("/api", (req, res) => {
   res.status(200).json({
     success: true,
@@ -126,7 +134,7 @@ app.get("/api/status", (req, res) => {
   });
 });
 
-/* ===================== DATABASE CONNECTION ===================== */
+/* ===================== DATABASE ===================== */
 mongoose
   .connect(process.env.MONGO_URI, {
     useNewUrlParser: true,
@@ -145,7 +153,7 @@ mongoose
     process.exit(1);
   });
 
-// MongoDB connection error handling
+// MongoDB connection event handlers
 mongoose.connection.on('error', (err) => {
   console.error('MongoDB connection error:', err);
 });
@@ -167,10 +175,8 @@ app.use("/api/announcements", require("./routes/announcements"));
 // Careers routes
 app.use("/api/careers", require("./routes/careers"));
 
-// Blog routes
+// Blog routes - Add this with your other route imports
 app.use("/api/blogs", require("./routes/blogs"));
-
-// Additional routes can be added here
 
 /* ===================== 404 HANDLER ===================== */
 app.use((req, res) => {
@@ -230,10 +236,12 @@ app.use((err, req, res, next) => {
 
 /* ===================== SERVER ===================== */
 const PORT = process.env.PORT || 5014;
+
 const server = app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📍 API URL: http://localhost:${PORT}/api`);
   console.log(`📁 Uploads directory: ${path.join(__dirname, 'uploads')}`);
+  console.log(`📂 Static files URL: http://localhost:${PORT}/uploads`);
   console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
 });
 
