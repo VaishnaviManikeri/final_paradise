@@ -1,47 +1,63 @@
-const mongoose = require("mongoose");
+const mongoose = require('mongoose');
 
 const blogSchema = new mongoose.Schema(
   {
     title: {
       type: String,
-      required: [true, "Blog title is required"],
+      required: true,
       trim: true,
     },
-    author: {
+    slug: {
       type: String,
-      default: "Admin",
-    },
-    excerpt: {
-      type: String,
-      default: "",
+      required: true,
+      unique: true,
+      trim: true,
+      lowercase: true,
     },
     content: {
       type: String,
-      required: [true, "Blog content is required"],
+      required: true,
     },
-    coverImage: {
+    excerpt: {
       type: String,
-      default: "",
+      required: true,
+      maxlength: 200,
     },
-    coverImageAlt: {
+    featuredImage: {
       type: String,
-      default: "",
+      required: true,
     },
-    metaTitle: {
-      type: String,
-      default: "",
-    },
-    metaDescription: {
-      type: String,
-      default: "",
+    author: {
+      name: {
+        type: String,
+        required: true,
+        default: 'Paradise EMS',
+      },
+      avatar: {
+        type: String,
+        default: '',
+      },
     },
     readingTime: {
-      type: Number,
-      default: 1,
+      type: String,
+      default: '5 min read',
     },
-    published: {
+    tags: [String],
+    category: {
+      type: String,
+      default: 'General',
+    },
+    isPublished: {
       type: Boolean,
       default: true,
+    },
+    publishedAt: {
+      type: Date,
+      default: Date.now,
+    },
+    views: {
+      type: Number,
+      default: 0,
     },
   },
   {
@@ -49,34 +65,15 @@ const blogSchema = new mongoose.Schema(
   }
 );
 
-// Pre-save middleware to calculate reading time.
-// (Mongoose 7+ removed callback-style `next` in pre/post hooks — this uses
-// plain async/await and throws on error instead of calling next(error).)
-blogSchema.pre("save", async function () {
-  if (this.isModified("content") && this.content) {
-    // Strip HTML tags and count words
-    const plainText = this.content
-      .replace(/<[^>]*>/g, " ")
-      .replace(/&[^;]+;/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-
-    const words = plainText ? plainText.split(/\s+/).filter(Boolean) : [];
-    const wordCount = words.length;
-
-    // Calculate reading time (assuming 200 words per minute)
-    this.readingTime = Math.max(1, Math.ceil(wordCount / 200));
+// Generate slug from title before saving
+blogSchema.pre('save', function (next) {
+  if (this.isModified('title') && !this.slug) {
+    this.slug = this.title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
   }
+  next();
 });
 
-// Add a method to get the blog URL (uses _id now, not slug)
-blogSchema.methods.getBlogUrl = function () {
-  return `/blogs/${this._id}`;
-};
-
-// Add a static method to find published blogs
-blogSchema.statics.findPublished = function () {
-  return this.find({ published: true }).sort({ createdAt: -1 });
-};
-
-module.exports = mongoose.model("Blog", blogSchema);
+module.exports = mongoose.model('Blog', blogSchema);
