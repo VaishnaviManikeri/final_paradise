@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const Blog = require("../models/Blog");
 const fs = require("fs");
 const path = require("path");
@@ -9,6 +10,8 @@ const removeFile = (filePath) => {
     if (err && err.code !== "ENOENT") console.error("File delete error:", err.message);
   });
 };
+
+const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
 
 // GET /api/blogs  (public - published only)
 exports.getPublishedBlogs = async (req, res) => {
@@ -34,30 +37,42 @@ exports.getAllBlogsAdmin = async (req, res) => {
   }
 };
 
-// GET /api/blogs/:slug  (public - single blog)
-exports.getBlogBySlug = async (req, res) => {
-  try {
-    const blog = await Blog.findOne({ slug: req.params.slug, published: true });
-    if (!blog) {
-      return res.status(404).json({ success: false, message: "Blog not found" });
-    }
-    res.status(200).json({ success: true, data: blog });
-  } catch (err) {
-    console.error("Error in getBlogBySlug:", err);
-    res.status(500).json({ success: false, message: err.message });
-  }
-};
-
-// GET /api/blogs/admin/id/:id  (protected - single blog for editing)
+// GET /api/blogs/:id  (public - single blog, published only)
 exports.getBlogById = async (req, res) => {
   try {
-    const blog = await Blog.findById(req.params.id);
+    const { id } = req.params;
+
+    if (!isValidId(id)) {
+      return res.status(404).json({ success: false, message: "Blog not found" });
+    }
+
+    const blog = await Blog.findOne({ _id: id, published: true });
     if (!blog) {
       return res.status(404).json({ success: false, message: "Blog not found" });
     }
     res.status(200).json({ success: true, data: blog });
   } catch (err) {
     console.error("Error in getBlogById:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// GET /api/blogs/admin/id/:id  (protected - single blog for editing, any status)
+exports.getBlogByIdAdmin = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!isValidId(id)) {
+      return res.status(404).json({ success: false, message: "Blog not found" });
+    }
+
+    const blog = await Blog.findById(id);
+    if (!blog) {
+      return res.status(404).json({ success: false, message: "Blog not found" });
+    }
+    res.status(200).json({ success: true, data: blog });
+  } catch (err) {
+    console.error("Error in getBlogByIdAdmin:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
@@ -71,29 +86,29 @@ exports.createBlog = async (req, res) => {
     console.log("Headers:", req.headers['content-type']);
 
     // Extract form data
-    const { 
-      title, 
-      author, 
-      excerpt, 
-      content, 
-      metaTitle, 
-      metaDescription, 
-      published, 
-      coverImageAlt 
+    const {
+      title,
+      author,
+      excerpt,
+      content,
+      metaTitle,
+      metaDescription,
+      published,
+      coverImageAlt
     } = req.body;
 
     // Validate required fields
     if (!title || !title.trim()) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Title is required" 
+      return res.status(400).json({
+        success: false,
+        message: "Title is required"
       });
     }
 
     if (!content || !content.trim() || content === '<p><br></p>') {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Content is required" 
+      return res.status(400).json({
+        success: false,
+        message: "Content is required"
       });
     }
 
@@ -118,20 +133,19 @@ exports.createBlog = async (req, res) => {
     // Create and save blog
     const blog = new Blog(blogData);
     await blog.save();
-    
+
     console.log("Blog created successfully:", blog._id);
-    console.log("Blog slug:", blog.slug);
-    
-    res.status(201).json({ 
-      success: true, 
+
+    res.status(201).json({
+      success: true,
       data: blog,
-      message: "Blog created successfully" 
+      message: "Blog created successfully"
     });
   } catch (err) {
     console.error("Error in createBlog:", err);
-    res.status(500).json({ 
-      success: false, 
-      message: err.message || "Failed to create blog" 
+    res.status(500).json({
+      success: false,
+      message: err.message || "Failed to create blog"
     });
   }
 };
@@ -144,23 +158,27 @@ exports.updateBlog = async (req, res) => {
     console.log("Body:", req.body);
     console.log("File:", req.file);
 
+    if (!isValidId(req.params.id)) {
+      return res.status(404).json({ success: false, message: "Blog not found" });
+    }
+
     const blog = await Blog.findById(req.params.id);
     if (!blog) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Blog not found" 
+      return res.status(404).json({
+        success: false,
+        message: "Blog not found"
       });
     }
 
-    const { 
-      title, 
-      author, 
-      excerpt, 
-      content, 
-      metaTitle, 
-      metaDescription, 
-      published, 
-      coverImageAlt 
+    const {
+      title,
+      author,
+      excerpt,
+      content,
+      metaTitle,
+      metaDescription,
+      published,
+      coverImageAlt
     } = req.body;
 
     // Update fields
@@ -171,7 +189,7 @@ exports.updateBlog = async (req, res) => {
     if (metaTitle !== undefined && metaTitle !== null) blog.metaTitle = metaTitle;
     if (metaDescription !== undefined && metaDescription !== null) blog.metaDescription = metaDescription;
     if (coverImageAlt !== undefined && coverImageAlt !== null) blog.coverImageAlt = coverImageAlt;
-    
+
     if (published !== undefined && published !== null) {
       blog.published = published === "false" ? false : Boolean(published);
     }
@@ -187,17 +205,17 @@ exports.updateBlog = async (req, res) => {
 
     await blog.save();
     console.log("Blog updated successfully:", blog._id);
-    
-    res.status(200).json({ 
-      success: true, 
+
+    res.status(200).json({
+      success: true,
       data: blog,
-      message: "Blog updated successfully" 
+      message: "Blog updated successfully"
     });
   } catch (err) {
     console.error("Error in updateBlog:", err);
-    res.status(500).json({ 
-      success: false, 
-      message: err.message || "Failed to update blog" 
+    res.status(500).json({
+      success: false,
+      message: err.message || "Failed to update blog"
     });
   }
 };
@@ -205,30 +223,34 @@ exports.updateBlog = async (req, res) => {
 // DELETE /api/blogs/:id  (protected)
 exports.deleteBlog = async (req, res) => {
   try {
+    if (!isValidId(req.params.id)) {
+      return res.status(404).json({ success: false, message: "Blog not found" });
+    }
+
     const blog = await Blog.findById(req.params.id);
     if (!blog) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Blog not found" 
+      return res.status(404).json({
+        success: false,
+        message: "Blog not found"
       });
     }
-    
+
     if (blog.coverImage) {
       removeFile(blog.coverImage);
     }
-    
+
     await blog.deleteOne();
     console.log("Blog deleted successfully:", blog._id);
-    
-    res.status(200).json({ 
-      success: true, 
-      message: "Blog deleted successfully" 
+
+    res.status(200).json({
+      success: true,
+      message: "Blog deleted successfully"
     });
   } catch (err) {
     console.error("Error in deleteBlog:", err);
-    res.status(500).json({ 
-      success: false, 
-      message: err.message || "Failed to delete blog" 
+    res.status(500).json({
+      success: false,
+      message: err.message || "Failed to delete blog"
     });
   }
 };
