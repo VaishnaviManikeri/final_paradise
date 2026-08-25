@@ -82,7 +82,7 @@ blogSchema.pre("save", async function (next) {
       let existingBlog = await Blog.findOne({ 
         slug: slug, 
         _id: { $ne: this._id } 
-      }).lean();
+      });
 
       // Keep trying until we find a unique slug
       while (existingBlog) {
@@ -90,7 +90,7 @@ blogSchema.pre("save", async function (next) {
         existingBlog = await Blog.findOne({ 
           slug: slug, 
           _id: { $ne: this._id } 
-        }).lean();
+        });
       }
 
       this.slug = slug;
@@ -112,24 +112,10 @@ blogSchema.pre("save", async function (next) {
       this.readingTime = Math.max(1, Math.ceil(wordCount / 200));
     }
 
-    // Proceed to save
     next();
   } catch (error) {
-    // Pass any error to the next middleware
     next(error);
   }
-});
-
-// Optional: Pre-validate hook for additional validation
-blogSchema.pre("validate", function(next) {
-  // Add any additional validation logic here
-  // This hook is called before validation runs
-  next();
-});
-
-// Optional: Post-save hook for logging or other operations
-blogSchema.post("save", function(doc) {
-  console.log(`Blog "${doc.title}" saved successfully with slug: ${doc.slug}`);
 });
 
 // Add a method to get the blog URL
