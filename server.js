@@ -96,6 +96,7 @@ app.use("/api/announcements", require("./routes/announcements"));
 app.use("/api/careers", require("./routes/careers"));
 // Add these after your existing routes
 // Add this with your other routes
+// Add this with your other routes
 app.use("/api/blogs", require("./routes/blog"));
 /* ===================== 404 HANDLER ===================== */
 app.use((req, res) => {
