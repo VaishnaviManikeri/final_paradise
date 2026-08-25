@@ -94,8 +94,8 @@ app.use("/api/auth", require("./routes/auth"));
 app.use("/api/gallery", require("./routes/gallery"));
 app.use("/api/announcements", require("./routes/announcements"));
 app.use("/api/careers", require("./routes/careers"));
-// Add this with your other route imports
-app.use("/api/blogs", require("./routes/blogs"));
+// Add this with your other routes
+app.use("/api/blog", require("./routes/blog"));
 /* ===================== 404 HANDLER ===================== */
 app.use((req, res) => {
   res.status(404).json({
