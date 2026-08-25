@@ -1,25 +1,11 @@
 const mongoose = require("mongoose");
 
-const slugify = (text) =>
-  text
-    .toString()
-    .toLowerCase()
-    .trim()
-    .replace(/[^\w\s-]/g, "")
-    .replace(/[\s_-]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-
 const blogSchema = new mongoose.Schema(
   {
     title: {
       type: String,
       required: [true, "Blog title is required"],
       trim: true,
-    },
-    slug: {
-      type: String,
-      unique: true,
-      index: true,
     },
     author: {
       type: String,
@@ -63,43 +49,10 @@ const blogSchema = new mongoose.Schema(
   }
 );
 
-// Pre-save middleware to generate slug and reading time
-// NOTE: Mongoose 7+ removed callback-style `next` support in pre/post hooks.
-// Declaring this as `async function (next)` and calling next()/next(error)
-// causes "TypeError: next is not a function" because `next` is undefined.
-// Just use async/await and throw on error — Mongoose awaits the promise
-// and automatically turns a thrown error into a rejected save().
+// Pre-save middleware to calculate reading time.
+// (Mongoose 7+ removed callback-style `next` in pre/post hooks — this uses
+// plain async/await and throws on error instead of calling next(error).)
 blogSchema.pre("save", async function () {
-  // Only generate slug if title is modified or slug is missing
-  if (this.isNew || this.isModified("title")) {
-    if (!this.title) {
-      throw new Error("Title is required to generate slug");
-    }
-
-    let baseSlug = slugify(this.title);
-    let slug = baseSlug;
-    let counter = 1;
-
-    // Check for uniqueness
-    const Blog = mongoose.model("Blog");
-    let existingBlog = await Blog.findOne({
-      slug: slug,
-      _id: { $ne: this._id },
-    });
-
-    // Keep trying until we find a unique slug
-    while (existingBlog) {
-      slug = `${baseSlug}-${counter++}`;
-      existingBlog = await Blog.findOne({
-        slug: slug,
-        _id: { $ne: this._id },
-      });
-    }
-
-    this.slug = slug;
-  }
-
-  // Calculate reading time if content is modified
   if (this.isModified("content") && this.content) {
     // Strip HTML tags and count words
     const plainText = this.content
@@ -116,9 +69,9 @@ blogSchema.pre("save", async function () {
   }
 });
 
-// Add a method to get the blog URL
+// Add a method to get the blog URL (uses _id now, not slug)
 blogSchema.methods.getBlogUrl = function () {
-  return `/blogs/${this.slug}`;
+  return `/blogs/${this._id}`;
 };
 
 // Add a static method to find published blogs
@@ -126,7 +79,4 @@ blogSchema.statics.findPublished = function () {
   return this.find({ published: true }).sort({ createdAt: -1 });
 };
 
-// ⚠️ THIS LINE WAS MISSING — without it, require("../models/Blog")
-// returns `undefined`, and every Blog.find/findById/new Blog(...) call
-// in the controller throws "Blog.find is not a function".
 module.exports = mongoose.model("Blog", blogSchema);
